@@ -1,0 +1,360 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #15151b;
+  --color-ink-soft: #1e1e26;
+  --color-paper: #f2f1ed;
+  --color-paper-warm: #f3f2ee;
+  --color-card: #fefdf9;
+  --color-chrome: #fafaf6;
+  --color-dock: #f5f4ef;
+  --color-line: #d4d1c9;
+  --color-line-soft: #d2cec9;
+  --color-violet: #5145e7;
+  --color-violet-deep: #1f1a80;
+  --color-lilac: #afa8ff;
+  --color-lilac-soft: #e4e0ff;
+  --color-mist: #dedce9;
+  --color-smoke: #777780;
+  --color-heroline: #464551;
+  --color-herorule: #595762;
+
+  --font-display: 'Fraunces', 'Georgia', serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* `clip` (not `hidden`) so position:sticky keeps working. */
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-violet);
+  color: #fff;
+}
+
+:where(a, button, [contenteditable='true']):focus-visible {
+  outline: 2px solid var(--color-violet);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cover deck. Every boundary is a hold-while-cover, all top-sticky:     */
+/* - Hero: 100svh card in a 200svh pin track; holds while Studio covers.*/
+/* - Tall chapters: the section scrolls through, then its tail holds   */
+/*   (JS-measured `top`, see useTailHold) while the next sheet, pulled  */
+/*   up 100svh by negative margin, covers it. Fully reversible.         */
+/* ------------------------------------------------------------------ */
+.hero-sticky {
+  height: 100svh;
+}
+@supports not (height: 100svh) {
+  .hero-sticky {
+    height: 100vh;
+  }
+}
+.pin-track {
+  height: 200svh;
+}
+@supports not (height: 100svh) {
+  .pin-track {
+    height: 200vh;
+  }
+}
+.tail-hold {
+  position: sticky;
+  /* `top` is measured in JS (see useTailHold): sticky `top` percentages
+     do not resolve against content-height parents. */
+}
+
+/* ------------------------------------------------------------------ */
+/* Hero entrance: masked line reveals, played once on `entered`.       */
+/* ------------------------------------------------------------------ */
+.reveal-mask {
+  display: block;
+  overflow: hidden;
+  /* Breathing room for descenders (the "g"), layout-compensated below. */
+  padding-bottom: max(3px, 0.6vw);
+  margin-bottom: calc(-1 * max(3px, 0.6vw));
+}
+.reveal-line {
+  display: block;
+  opacity: 0;
+  transform: translateY(115%);
+}
+.is-entered .reveal-line {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    transform 1s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.7s ease;
+}
+.is-entered .hero-fade {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.9s ease,
+    transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-fade {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.is-entered .hero-art {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity 1.1s ease,
+    transform 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-art {
+  opacity: 0;
+  transform: scale(1.05);
+}
+
+/* ------------------------------------------------------------------ */
+/* Opening: one continuous A -> B -> B2 -> C timeline. A rAF loop       */
+/* writes eased progress variables; every element below is a smooth     */
+/* function of them, so nothing ever flips discretely between frames.   */
+/* ------------------------------------------------------------------ */
+.opening {
+  opacity: var(--o-root, 1);
+}
+.opening-artifact {
+  position: absolute;
+  left: var(--ap-x, 50%);
+  top: var(--ap-y, 63%);
+  width: var(--ap-w, 100px);
+  height: var(--ap-h, 100px);
+  border-radius: var(--ap-r, 9999px);
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  opacity: var(--ap-o, 0);
+  will-change: left, top, width, height, border-radius;
+}
+.opening-artifact img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.opening-wordmark {
+  position: absolute;
+  left: var(--wm-x, 24px);
+  top: var(--wm-y, 30px);
+  font-size: var(--wm-s, 31px);
+  opacity: var(--wm-o, 0);
+  white-space: nowrap;
+  line-height: 1;
+  will-change: left, top, font-size;
+}
+.opening-tag {
+  opacity: var(--o-tag, 0);
+}
+.opening-fa {
+  opacity: var(--o-fa, 1);
+}
+.opening-kin {
+  opacity: var(--o-kin, 0);
+  transform: translateY(var(--kin-y, 26px));
+}
+.opening-nav {
+  opacity: var(--o-nav, 0);
+}
+.opening-g1 {
+  opacity: calc(var(--o-g1, 0) * 0.8);
+  transform: translateY(var(--g-y, 30px));
+}
+.opening-g2 {
+  opacity: calc(var(--o-g2, 0) * 0.32);
+  transform: translateY(var(--g-y, 30px));
+}
+.opening-g3 {
+  opacity: calc(var(--o-g3, 0) * 0.07);
+  transform: translateY(var(--g-y, 30px));
+}
+
+/* ------------------------------------------------------------------ */
+/* Publication morph stage. `--p` (0..1) is scrubbed from scroll;      */
+/* every value below is a pure function of it, hence reversible.       */
+/* ------------------------------------------------------------------ */
+.poster-track {
+  --p: 0;
+}
+.poster-card {
+  position: relative;
+  width: min(300px, 64vw);
+  aspect-ratio: 350.67 / 459.51;
+  transform: translateY(calc((1 - var(--p)) * 46px))
+    scale(calc(1.14 - var(--p) * 0.14)) rotate(calc((1 - var(--p)) * 3.5deg));
+  box-shadow:
+    calc(var(--p) * -18px) calc(var(--p) * 22px) 0 0 var(--color-violet-deep),
+    0 calc(var(--p) * 40px) calc(var(--p) * 80px) rgba(10, 8, 40, 0.45);
+}
+.poster-paper {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: var(--color-paper);
+  opacity: var(--p);
+}
+.poster-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  clip-path: inset(
+    calc(var(--p) * 66%) calc(var(--p) * 8.5%) calc(var(--p) * 12%)
+      calc(var(--p) * 8.5%)
+  );
+}
+.poster-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(calc(1 + (1 - var(--p)) * 0.12));
+}
+.poster-copy {
+  opacity: clamp(0, calc((var(--p) - 0.42) * 2.4), 1);
+  transform: translateY(calc((1 - var(--p)) * 18px));
+}
+.poster-motif {
+  position: absolute;
+  left: 8.5%;
+  right: 8.5%;
+  bottom: 12%;
+  height: 19.5%;
+  background: var(--color-violet);
+  opacity: clamp(0, calc((var(--p) - 0.55) * 2.6), 1);
+}
+.poster-cutout {
+  position: absolute;
+  left: 50.5%;
+  bottom: 12.5%;
+  width: 22.5%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: var(--color-paper);
+  transform: translateX(-18%)
+    scale(clamp(0.15, calc((var(--p) - 0.62) * 2.6), 1));
+}
+.poster-draft-tag {
+  position: absolute;
+  left: 0;
+  bottom: -2.4rem;
+  opacity: clamp(0, calc(1 - var(--p) * 2.4), 1);
+}
+.poster-live-tag {
+  opacity: clamp(0, calc((var(--p) - 0.72) * 3.4), 1);
+}
+@media (min-width: 768px) {
+  .poster-card {
+    width: min(300px, 36vw);
+  }
+}
+@media (min-width: 1024px) {
+  .poster-card {
+    width: min(351px, 26vw);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Closing: one quiet clip reveal.                                     */
+/* ------------------------------------------------------------------ */
+.closing-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  clip-path: inset(0 0 100% 0);
+}
+.closing-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 0 0);
+  transition:
+    opacity 1s ease,
+    transform 1.1s cubic-bezier(0.22, 1, 0.36, 1),
+    clip-path 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Studio editor                                                       */
+/* ------------------------------------------------------------------ */
+[contenteditable='true'] {
+  caret-color: var(--color-violet);
+  transition: background-color 0.25s ease;
+}
+[contenteditable='true']:hover {
+  background-color: rgba(81, 69, 231, 0.05);
+}
+[contenteditable='true']:focus {
+  background-color: rgba(81, 69, 231, 0.07);
+  outline: none;
+}
+[contenteditable='true']:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.modal-panel {
+  animation: modal-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-backdrop {
+  animation: backdrop-in 0.3s ease;
+}
+
+@keyframes cta-arrow-nudge {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(3px, -3px);
+  }
+}
+.group:hover .cta-arrow {
+  animation: cta-arrow-nudge 0.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
